@@ -1,7 +1,10 @@
 # DotsBoxesQLearn
 
-A basic Q-learning implementation for the game Dots and Boxes. I train two models, with each model acting as the enviroment for the other model.
+- `vanilla_ql.py`. A basic Q-learning implementation for the game Dots and Boxes. I train two models, with each model acting as the enviroment for the other model.
 
-*Coming soon*. A deep Q-learning implementation with PyTorch.
+- `deep_ql.py`. A deep Q-learning implementation with PyTorch.
 
-See also [here](https://puzzling.stackexchange.com/questions/1728/optimal-play-for-2-by-2-dots-and-boxes).
+
+
+To do: 
+- currently, the deep QL works pretty well. But we know that with optimal play, player 1 should always win. The deep QL network doesn't quite get to this. I think part of the problem is that there are times when the output is all zero (see the game_player method). Think of a way to get around this.

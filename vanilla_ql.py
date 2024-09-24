@@ -2,6 +2,11 @@ import game
 from typing import Tuple
 import random, collections
 
+WINNER_REWARD = 100
+TIE_REWARD = 3
+SQUARE_COMPLETED_REWARD = 1
+LOSER_REWARD = -5
+
 
 class QTable:
 
@@ -64,20 +69,36 @@ class QTable:
             # figure out their optimal move, and then figure out our future reward based on
             # the assumption that the other player is playing optimally
 
-            other_best_action = other_Q.get_optimal_action(new_board)
             new_new_board = new_board.copy()
-            new_new_board.player_add_edge(
-                new_new_board.index_to_move(other_best_action),
-                1 if self.player == 2 else 2,
-            )
-            new_new_board_hash = new_new_board.hash()
-            self.Q[(board_hash, action)] = (1 - lr) * self.Q[
-                (board_hash, action)
-            ] + lr * (
-                reward
-                + discount
-                * max(self.Q[(new_new_board_hash, a)] for a in range(self.dim))
-            )
+            completed, winner = True, 0
+            while completed and not winner:
+                other_best_action = other_Q.get_optimal_action(new_new_board)
+                completed = new_new_board.player_add_edge(
+                    new_new_board.index_to_move(other_best_action),
+                    other_Q.player,
+                )
+                winner = new_new_board.is_game_over()
+
+            if not winner:
+                new_new_board_hash = new_new_board.hash()
+                self.Q[(board_hash, action)] = (1 - lr) * self.Q[
+                    (board_hash, action)
+                ] + lr * (
+                    reward
+                    + discount
+                    * max(self.Q[(new_new_board_hash, a)] for a in range(self.dim))
+                )
+            else:
+                # game is over by other person's moves
+                if winner == 3:
+                    rew = TIE_REWARD
+                elif winner == self.player:
+                    rew = WINNER_REWARD
+                else:
+                    rew = LOSER_REWARD
+                self.Q[(board_hash, action)] = (1 - lr) * self.Q[
+                    (board_hash, action)
+                ] + lr * (reward + discount * rew)
 
     def game_player(self, board: game.Board, exploration: float = 0.0) -> game.Move:
         if random.random() <= exploration:
@@ -121,7 +142,7 @@ def train_qtables(
                 print(f"Starting epoch {epoch} out of {epochs}")
             exploration /= 1.05
 
-        lr = initial_lr / (1 + epoch // (epochs // 100))
+        lr = initial_lr / (1 + epoch // (1 + epochs // 100))
 
         cont_game = game.Game(
             num_rows,
@@ -149,7 +170,7 @@ def train_qtables(
                     board=current_board,
                     action=move_index,
                     new_board=new_board,
-                    reward=3 if square_completed else 0,
+                    reward=SQUARE_COMPLETED_REWARD if square_completed else 0,
                     lr=lr,
                     discount=discount,
                     game_over=False,
@@ -167,7 +188,7 @@ def train_qtables(
                 board=current_board,
                 action=move_index,
                 new_board=new_board,
-                reward=10 if winner == 3 else 1000,
+                reward=TIE_REWARD if winner == 3 else WINNER_REWARD,
                 lr=lr,
                 discount=discount,
                 game_over=True,
@@ -177,7 +198,7 @@ def train_qtables(
 
 
 if __name__ == "__main__":
-    num_rows, num_cols = 2, 1
+    num_rows, num_cols = 2, 2
 
     # model1 = QTable(num_rows, num_cols, 1)
     # model1.load_qmatrix(f"{num_rows}{num_cols}_player1")
@@ -193,7 +214,7 @@ if __name__ == "__main__":
     #     player2=game.user_player,
     # ).play()
 
-    model1, model2 = train_qtables(num_rows, num_cols, epochs=10000, verbose=False)
+    model1, model2 = train_qtables(num_rows, num_cols, epochs=1000, verbose=True)
     print(
         "Winner",
         game.Game(
@@ -209,7 +230,7 @@ if __name__ == "__main__":
         model1, model2 = train_qtables(
             num_rows,
             num_cols,
-            epochs=10000,
+            epochs=1000,
             model1=model1,
             model2=model2,
             train_model1=False,
@@ -223,13 +244,13 @@ if __name__ == "__main__":
                 player1=model1.game_player,
                 player2=model2.game_player,
             ).play(False),
-            "(should be 2 or 3)",
+            "(should be 1, 2, or 3)",
         )
 
         model1, model2 = train_qtables(
             num_rows,
             num_cols,
-            epochs=10000,
+            epochs=1000,
             model1=model1,
             model2=model2,
             train_model2=False,
@@ -247,7 +268,7 @@ if __name__ == "__main__":
         )
 
     model1, model2 = train_qtables(
-        num_rows, num_cols, epochs=10000, model1=model1, model2=model2, verbose=False
+        num_rows, num_cols, epochs=1000, model1=model1, model2=model2, verbose=False
     )
     print(
         "Winner",

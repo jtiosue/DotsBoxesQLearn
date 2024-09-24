@@ -21,7 +21,8 @@ class Board:
         self.num_vert_edges = num_rows * (num_cols + 1)
         self.num_hori_edges = num_cols * (num_rows + 1)
         self.grid = np.zeros(self.num_vert_edges + self.num_hori_edges)
-        self.squares = {(r, c): None for r in range(num_rows) for c in range(num_cols)}
+        self.squares = np.zeros((num_rows, num_cols), dtype=np.int8)
+        # self.squares = {(r, c): None for r in range(num_rows) for c in range(num_cols)}
 
     def copy(self):
         b = Board(self.num_rows, self.num_cols)
@@ -31,9 +32,10 @@ class Board:
 
     def reset(self) -> None:
         self.grid = np.zeros(self.num_vert_edges + self.num_hori_edges)
-        self.squares = {
-            (r, c): None for r in range(self.num_rows) for c in range(self.num_cols)
-        }
+        self.squares = np.zeros((self.num_rows, self.num_cols))
+        # self.squares = {
+        #     (r, c): None for r in range(self.num_rows) for c in range(self.num_cols)
+        # }
 
     def move_to_index(self, move: Move) -> int:
         # unique integer corresponding to an edge
@@ -63,34 +65,42 @@ class Board:
     def add_left_square(self, row: int, col: int, player: int) -> None:
         # left of a vert
         if col - 1 >= 0:
-            self.squares[(row, col - 1)] = player
+            # self.squares[(row, col - 1)] = player
+            self.squares[row, col - 1] = player
 
     def get_left_square(self, row: int, col: int) -> int:
-        return self.squares.get((row, col - 1), 0)
+        # return self.squares.get((row, col - 1), 0)
+        return self.squares[row, col - 1]
 
     def add_right_square(self, row: int, col: int, player: int) -> None:
         # right of a vert
         if col < self.num_cols:
-            self.squares[(row, col)] = player
+            # self.squares[(row, col)] = player
+            self.squares[row, col] = player
 
     def get_right_square(self, row: int, col: int) -> int:
-        return self.squares.get((row, col), 0)
+        # return self.squares.get((row, col), 0)
+        return self.squares[row, col]
 
     def add_top_square(self, row: int, col: int, player: int) -> None:
         # top of a horizontal
         if row - 1 >= 0:
-            self.squares[(row - 1, col)] = player
+            # self.squares[(row - 1, col)] = player
+            self.squares[row - 1, col] = player
 
     def get_top_square(self, row: int, col: int) -> int:
-        return self.squares.get((row - 1, col), 0)
+        # return self.squares.get((row - 1, col), 0)
+        return self.squares[row - 1, col]
 
     def add_bot_square(self, row: int, col: int, player: int) -> None:
         # bottom of a horizontal
         if row < self.num_rows:
-            self.squares[(row, col)] = player
+            # self.squares[(row, col)] = player
+            self.squares[row, col] = player
 
     def get_bot_square(self, row: int, col: int) -> int:
-        return self.squares.get((row, col), 0)
+        # return self.squares.get((row, col), 0)
+        return self.squares[row, col]
 
     def square_completed(self, row: int, col: int) -> bool:
         return (
@@ -129,7 +139,7 @@ class Board:
         return completed
 
     def score(self) -> Tuple[int, int]:
-        vals = self.squares.values()
+        vals = self.squares.flatten()
         return len([x for x in vals if x == 1]), len([x for x in vals if x == 2])
 
     def is_game_over(self) -> int:
