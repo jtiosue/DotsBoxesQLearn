@@ -7,10 +7,10 @@ import numpy as np
 import random
 
 
-WINNER_REWARD = 5
+WINNER_REWARD = 2
 TIE_REWARD = 1
-SQUARE_COMPLETED_REWARD = 1
-LOSER_REWARD = -5
+SQUARE_COMPLETED_REWARD = 0
+LOSER_REWARD = 0
 
 
 class Net(nn.Module):
@@ -19,9 +19,9 @@ class Net(nn.Module):
         num_rows: int,
         num_cols: int,
         player: int,
-        hidden_layers: int = 10,
+        hidden_layers: int = 3,
         hidden_dim: int = None,
-        activation=nn.Tanh,
+        activation=nn.ReLU,
     ) -> None:
         super().__init__()
 
@@ -33,7 +33,7 @@ class Net(nn.Module):
         self.num_edges = num_rows * (num_cols + 1) + num_cols * (num_rows + 1)
         input_dim = self.num_edges + num_squares // 2
         if hidden_dim is None:
-            hidden_dim = 2 * input_dim
+            hidden_dim = input_dim
         output_dim = self.num_edges
         if not hidden_layers:
             layers = [nn.Linear(input_dim, output_dim)]
@@ -44,8 +44,8 @@ class Net(nn.Module):
                 layers.append(activation())
             layers.append(nn.Linear(hidden_dim, output_dim))
 
-        # self.layers.append(nn.Sigmoid())
-        layers.append(activation())
+        layers.append(nn.ReLU())
+        # layers.append(activation())
 
         self.layers = nn.ModuleList(layers)
 
@@ -115,13 +115,13 @@ class Training:
     # Hyperparameters (adjustable)
     learning_rate_a = 0.05  # learning rate (alpha)
     discount_factor_g = 1  # discount rate (gamma)
-    network_sync_rate = 10  # number of steps the agent takes before syncing the policy and target network
+    network_sync_rate = 20  # number of steps the agent takes before syncing the policy and target network
     replay_memory_size = 1000  # size of replay memory
     mini_batch_size = 100  # size training data set sampled from the replay memory
 
-    hidden_layers: int = 3
+    hidden_layers: int = 8
     hidden_dim: int = None
-    activation = nn.ReLU
+    activation = nn.Tanh
 
     # Neural Network
     loss_fn = nn.MSELoss()
@@ -156,11 +156,19 @@ class Training:
         optimizers = {
             # 1: torch.optim.Adam(policy1.parameters(), lr=self.learning_rate_a),
             # 2: torch.optim.Adam(policy2.parameters(), lr=self.learning_rate_a),
-            1: torch.optim.SGD(
-                policy1.parameters(), lr=self.learning_rate_a, momentum=0.9
+            1: (
+                torch.optim.SGD(
+                    policy1.parameters(), lr=self.learning_rate_a, momentum=0.9
+                )
+                if train_model1
+                else None
             ),
-            2: torch.optim.SGD(
-                policy2.parameters(), lr=self.learning_rate_a, momentum=0.9
+            2: (
+                torch.optim.SGD(
+                    policy2.parameters(), lr=self.learning_rate_a, momentum=0.9
+                )
+                if train_model2
+                else None
             ),
         }
         memories = {
@@ -188,8 +196,8 @@ class Training:
             cont_game = game.Game(
                 num_rows,
                 num_cols,
-                lambda b: policy1.game_player(b, exploration),
-                lambda b: policy2.game_player(b, exploration),
+                lambda b: policy1.game_player(b, exploration if train_model1 else 0.15),
+                lambda b: policy2.game_player(b, exploration if train_model2 else 0.15),
             )
 
             while playing:
@@ -220,7 +228,11 @@ class Training:
                     if winner != 3 and winner != turn:
                         raise ValueError("Something went wrong!!")
 
-                    reward = TIE_REWARD if winner == 3 else WINNER_REWARD
+                    # reward = TIE_REWARD if winner == 3 else WINNER_REWARD
+                    if turn == 1:
+                        reward = 0 if winner == 3 else WINNER_REWARD
+                    else:
+                        reward = TIE_REWARD if winner == 3 else WINNER_REWARD
                 else:
                     reward = SQUARE_COMPLETED_REWARD if square_completed else 0
 
@@ -344,57 +356,63 @@ if __name__ == "__main__":
     num_rows, num_cols = 2, 2
 
     model1, model2 = Training().train(num_rows, num_cols, epochs=1000)
-    print(
-        game.Game(
-            num_rows,
-            num_cols,
-            player1=model1.game_player,
-            player2=model2.game_player,
-        ).play(False)
-    )
-
-    for _ in range(10):
-        model1, model2 = Training().train(
-            num_rows,
-            num_cols,
-            epochs=1000,
-            verbose=False,
-            model1=model1,
-            model2=model2,
-            train_model1=True,
-            train_model2=False,
-        )
-        winner = game.Game(
-            num_rows,
-            num_cols,
-            player1=model1.game_player,
-            player2=model2.game_player,
-        ).play(False)
-        print(f"winner = {winner} (Should be 1)")
-
-        model1, model2 = Training().train(
-            num_rows,
-            num_cols,
-            epochs=1000,
-            verbose=False,
-            model1=model1,
-            model2=model2,
-            train_model1=False,
-            train_model2=True,
-        )
-        winner = game.Game(
-            num_rows,
-            num_cols,
-            player1=model1.game_player,
-            player2=model2.game_player,
-        ).play(False)
-        print(f"winner = {winner} (Should be 1, 2 or 3)")
-
-    model1, model2 = Training().train(
-        num_rows, num_cols, epochs=1000, model1=model1, model2=model2
-    )
     model1.save(f"{num_rows}{num_cols}_player1")
     model2.save(f"{num_rows}{num_cols}_player2")
+    # print(
+    #     game.Game(
+    #         num_rows,
+    #         num_cols,
+    #         player1=model1.game_player,
+    #         player2=model2.game_player,
+    #     ).play(False)
+    # )
+
+    # for _ in range(5):
+    #     model1, model2 = Training().train(
+    #         num_rows,
+    #         num_cols,
+    #         epochs=1000,
+    #         verbose=False,
+    #         model1=model1,
+    #         model2=model2,
+    #         train_model1=True,
+    #         train_model2=False,
+    #     )
+    #     model1.save(f"{num_rows}{num_cols}_player1")
+    #     model2.save(f"{num_rows}{num_cols}_player2")
+    #     winner = game.Game(
+    #         num_rows,
+    #         num_cols,
+    #         player1=model1.game_player,
+    #         player2=model2.game_player,
+    #     ).play(False)
+    #     print(f"winner = {winner} (Should be 1)")
+
+    #     model1, model2 = Training().train(
+    #         num_rows,
+    #         num_cols,
+    #         epochs=1000,
+    #         verbose=False,
+    #         model1=model1,
+    #         model2=model2,
+    #         train_model1=False,
+    #         train_model2=True,
+    #     )
+    #     model1.save(f"{num_rows}{num_cols}_player1")
+    #     model2.save(f"{num_rows}{num_cols}_player2")
+    #     winner = game.Game(
+    #         num_rows,
+    #         num_cols,
+    #         player1=model1.game_player,
+    #         player2=model2.game_player,
+    #     ).play(False)
+    #     print(f"winner = {winner} (Should be 1, 2 or 3)")
+
+    # model1, model2 = Training().train(
+    #     num_rows, num_cols, epochs=1000, model1=model1, model2=model2
+    # )
+    # model1.save(f"{num_rows}{num_cols}_player1")
+    # model2.save(f"{num_rows}{num_cols}_player2")
 
     model1, model2 = Training().train(
         num_rows, num_cols, train_model1=False, train_model2=False
@@ -415,9 +433,9 @@ if __name__ == "__main__":
             num_cols,
             player1=model1.game_player,
             # player1=game.user_player,
-            # player1=lambda b: van_model1.game_player(b, 0.2),
-            # player2=model2.game_player,
+            # player1=lambda b: van_model1.game_player(b, 0.0),
+            # player2=lambda b: model2.game_player(b, 0.0),
             # player2=game.user_player,
-            player2=lambda b: van_model2.game_player(b, 0.2),
+            player2=lambda b: van_model2.game_player(b, 1),
         ).play(False)
         print(winner)

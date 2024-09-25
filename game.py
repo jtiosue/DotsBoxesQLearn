@@ -52,7 +52,12 @@ class Board:
             index -= self.num_vert_edges
             row = index // self.num_cols
             col = index - row * self.num_cols
-        return Move(row, col, vert)
+
+        move = Move(row, col, vert)
+        if not self.is_valid(move):
+            move.valid = False
+
+        return move
 
     def add_edge(self, move: Move) -> None:
         self.grid[self.move_to_index(move)] = 1

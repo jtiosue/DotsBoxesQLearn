@@ -14,6 +14,12 @@ class QTable:
         self.dim = len(game.Board(num_rows, num_cols).grid)
         self.Q = collections.defaultdict(float)
         self.player = player  # player 1 or player 2
+        self.args = num_rows, num_cols, player
+
+    def copy(self) -> "QTable":
+        q = QTable(*self.args)
+        q.Q = self.Q.copy()
+        return q
 
     def load_qmatrix(self, filename: str) -> None:
         with open(f"models/{filename}.van") as f:
