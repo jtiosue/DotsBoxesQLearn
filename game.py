@@ -160,10 +160,10 @@ class Board:
         else:
             return 0
 
-    def hash(self) -> Tuple[int, int, int]:
+    def hash(self, player: int = 1) -> Tuple[int, int]:
         h = int(np.dot(2 ** np.arange(len(self.grid)), self.grid))
         s = self.score()
-        return h, s[0], s[1]
+        return h, s[player - 1]
 
     def __str__(self) -> str:
         s = "Score: " + str(self.score()) + "\n"
