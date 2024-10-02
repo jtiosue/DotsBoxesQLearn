@@ -92,6 +92,7 @@ class Net(nn.Module):
 
 
 ######### Adapated from https://github.com/johnnycode8/gym_solutions/blob/main/frozen_lake_dql.py
+######## https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
 
 
 # Define memory for Experience Replay
@@ -118,17 +119,20 @@ class ReplayMemory:
 class Training:
     # Hyperparameters (adjustable)
     learning_rate_a = 0.01  # learning rate (alpha)
-    discount_factor_g = 1  # discount rate (gamma)
+    discount_factor_g = 0.99  # discount rate (gamma)
     network_sync_rate = 20  # number of steps the agent takes before syncing the policy and target network
-    replay_memory_size = 200  # size of replay memory
-    mini_batch_size = 50  # size training data set sampled from the replay memory
+    replay_memory_size = 1000  # size of replay memory
+    mini_batch_size = 128  # size training data set sampled from the replay memory
+
+    tau = 0.01
 
     hidden_layers: int = 7
     hidden_dim: int = None
     activation = nn.ReLU
 
     # Neural Network
-    loss_fn = nn.MSELoss()
+    # loss_fn = nn.MSELoss()
+    loss_fn = nn.SmoothL1Loss()
     # loss_fn = nn.BCELoss()
 
     loss = []
@@ -154,8 +158,8 @@ class Training:
 
         target = policy.copy()
 
-        optimizer = torch.optim.SGD(
-            policy.parameters(), lr=self.learning_rate_a, momentum=0.9
+        optimizer = torch.optim.AdamW(
+            policy.parameters(), lr=self.learning_rate_a, amsgrad=True
         )
         memory = ReplayMemory(self.replay_memory_size)
 
@@ -253,9 +257,19 @@ class Training:
                 )
 
                 # Copy policy network to target network after a certain number of steps
-                if step_count > self.network_sync_rate:
-                    target = policy.copy()
-                    step_count = 0
+                # if step_count > self.network_sync_rate:
+                #     target = policy.copy()
+                #     step_count = 0
+
+                # Soft update of the target network's weights
+                # θ′ ← τ θ + (1 −τ )θ′
+                target_state_dict = target.state_dict()
+                policy_state_dict = policy.state_dict()
+                for key in policy_state_dict:
+                    target_state_dict[key] = policy_state_dict[
+                        key
+                    ] * self.tau + target_state_dict[key] * (1 - self.tau)
+                target.load_state_dict(target_state_dict)
 
             # Decay exploration
             exploration = max(exploration - 1 / epochs, 0)
@@ -325,6 +339,7 @@ class Training:
         # Optimize the model
         optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_value_(policy.parameters(), 100)
         optimizer.step()
 
 
@@ -332,8 +347,8 @@ if __name__ == "__main__":
 
     num_rows, num_cols = 2, 2
 
-    model = Training().train(num_rows, num_cols, epochs=1e4)
-    model.save(f"{num_rows}{num_cols}")
+    # model = Training().train(num_rows, num_cols, epochs=5 * 1e4)
+    # model.save(f"{num_rows}{num_cols}")
 
     model = Training().train(num_rows, num_cols, train_model=False)
     model.load(f"{num_rows}{num_cols}")
@@ -350,14 +365,12 @@ if __name__ == "__main__":
         winner = game.Game(
             num_rows,
             num_cols,
-            player1=model.game_player1,
+            # player1=model.game_player1,
             # player1=game.user_player,
-            # player1=lambda b: van_model.game_player1(b, 1),
-            # player2=lambda b: model.game_player2(b, 0.0),
+            player1=lambda b: van_model.game_player1(b, 1),
+            player2=lambda b: model.game_player2(b, 0),
             # player2=game.user_player,
-            player2=lambda b: van_model.game_player2(b, 1),
+            # player2=lambda b: van_model.game_player2(b, 0),
         ).play(False)
         winners[winner] += 1
     print(winners)
-    # need to beat {1: 781, 2: 54, 3: 165} for 100
-    # {1: 838, 2: 46, 3: 116} for 1000
